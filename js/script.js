@@ -39,20 +39,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /* ---------- Active nav link highlight by current page/hash ---------- */
-  const path = window.location.pathname.split('/').pop() || 'index.html';
-  const hash = window.location.hash;
+  const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+  const currentHash = window.location.hash || '#home';
   document.querySelectorAll('.nav-link').forEach(link => {
     const href = link.getAttribute('href') || '';
-    const [hrefPath, hrefHash] = href.split('#');
-    const linkPath = hrefPath || path; // a bare "#foo" link implies the current page
-    const samePage = linkPath.endsWith(path);
-    let isActive = false;
-    if (hash) {
-      isActive = samePage && hrefHash === hash.slice(1);
-    } else {
-      isActive = samePage && (hrefHash === 'home' || (!hrefHash && path !== 'index.html'));
-    }
-    link.classList.toggle('active', isActive);
+    const [hrefPathRaw, hrefHashRaw] = href.split('#');
+    const hrefPath = hrefPathRaw || currentPath;
+    const hrefHash = hrefHashRaw ? '#' + hrefHashRaw : '';
+    const samePage = hrefPath.endsWith(currentPath);
+    const sameHash = hrefHash === currentHash;
+    link.classList.toggle('active', samePage && sameHash);
   });
 
   /* ---------- Scroll reveal ---------- */
@@ -160,50 +156,45 @@ document.addEventListener('DOMContentLoaded', () => {
     sw.addEventListener('click', () => sw.classList.toggle('on'));
   });
 
-  /* ---------- Contact forms (Netlify Forms via AJAX submit) ---------- */
-  function encodeFormData(data) {
-    return Object.keys(data)
-      .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
-      .join('&');
+  /* ---------- Contact forms (Netlify Forms via AJAX) ---------- */
+  function encodeForm(data) {
+    return Object.keys(data).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(data[k])).join('&');
   }
-
   document.querySelectorAll('.contact-form').forEach(form => {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const msg = form.querySelector('.form-msg');
-      const nameField = form.querySelector('input[name="full_name"]') || form.querySelector('input[type="text"]');
+      const nameField = form.querySelector('input[name="name"]') || form.querySelector('input[type="text"]');
       const name = nameField ? nameField.value.trim() : '';
-
-      // Honeypot check — if the hidden bot-field has a value, silently drop it
-      const honeypot = form.querySelector('input[name="bot-field"]');
-      if (honeypot && honeypot.value) {
-        form.reset();
-        return;
-      }
-
+      const submitBtn = form.querySelector('button[type="submit"]');
       const formData = new FormData(form);
       const payload = {};
       formData.forEach((value, key) => { payload[key] = value; });
 
+      if (submitBtn) submitBtn.disabled = true;
+
       fetch('/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: encodeFormData(payload)
+        body: encodeForm(payload)
       })
         .then(() => {
           if (msg) {
             msg.textContent = (name ? 'Thanks, ' + name + '! ' : 'Thanks! ') + 'Your message has been received. Abdul Manaf will get back to you soon.';
+            msg.classList.remove('err');
             msg.classList.add('show', 'ok');
           }
           form.reset();
         })
         .catch(() => {
           if (msg) {
-            msg.textContent = 'Something went wrong sending your message — please email abdulmanafmemon@gmail.com directly.';
-            msg.classList.add('show');
+            msg.textContent = 'Something went wrong sending your message. Please email abdulmanafmemon@gmail.com directly.';
+            msg.classList.remove('ok');
+            msg.classList.add('show', 'err');
           }
         })
         .finally(() => {
+          if (submitBtn) submitBtn.disabled = false;
           setTimeout(() => { if (msg) msg.classList.remove('show'); }, 6000);
         });
     });
